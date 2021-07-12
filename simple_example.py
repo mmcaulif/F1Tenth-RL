@@ -29,6 +29,7 @@ environment while visualising it
 #pip install --user -e gym/
 #in the f1tenth_gym folder
 
+import wandb
 import gym
 import time
 import numpy as np
@@ -48,7 +49,7 @@ TRAIN_DIRECTORY = "./train"
 TRAIN_STEPS = 1.5 * np.power(10, 5)    # for reference, it takes about one sec per 500 steps
 SAVE_CHECK_FREQUENCY = int(TRAIN_STEPS / 10)
 MIN_EVAL_EPISODES = 100
-NUM_PROCESS = 4
+NUM_PROCESS = 3
 MAP_PATH = "./f1tenth_racetracks/Austin/Austin_map"
 MAP_EXTENSION = ".png"
 
@@ -77,7 +78,8 @@ def main():
     envs = make_vec_env(wrap_env,
                         n_envs=NUM_PROCESS,
                         seed=np.random.randint(pow(2, 31) - 1),
-                        vec_env_cls=SubprocVecEnv)
+                        vec_env_cls=SubprocVecEnv,
+                        monitor_dir='./train_test/')
 
     # choose RL model and policy here
     """eval_env = gym.make("f110_gym:f110-v0",map=MAP_PATH,map_ext=MAP_EXTENSION,num_agents=1)
@@ -85,10 +87,10 @@ def main():
     eval_env = RandomF1TenthMap(eval_env, 500)
     eval_env.seed(np.random.randint(pow(2, 31) - 1))"""
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") #RuntimeError: CUDA error: out of memory whenever I use gpu
+    wandb.init(sync_tensorboard=True)
     model = PPO("MlpPolicy", envs,  learning_rate=linear_schedule(0.0003), gamma=0.99, gae_lambda=0.95, verbose=1, device='cpu')
-    eval_callback = EvalCallback(envs, best_model_save_path='./train_test/',
-                             log_path='./train_test/', eval_freq=5000,
-                             deterministic=True, render=False)
+    #eval_callback = EvalCallback(envs, best_model_save_path='./train_test/',log_path='./train_test/', eval_freq=5000,deterministic=True, render=False)
+    eval_callback = SaveOnBestTrainingRewardCallback(check_freq=250, log_dir='./train_test/')
 
     # train model and record time taken
     start_time = time.time()
